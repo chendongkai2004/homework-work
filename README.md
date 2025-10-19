@@ -147,102 +147,142 @@ flowchart TD
 
 ##四、 计算模块部分单元测试展示
 
-### 4.1单元测试代码
+### 4.1代码说明
 
-以下是计算模块的关键单元测试代码，使用Python的unittest框架：
+关键代码段1：表达式生成：
 
 ```python
-import unittest
-import os
-import tempfile
-from one import read_file, preprocess_text, calculate_similarity, write_result
-
-class TestPlagiarismChecker(unittest.TestCase):
+def generate_simple_expression(self) -> str:
+    """生成简单的表达式（1-3个运算符）"""
+    num_operators = random.randint(1, 3)
+    numbers = [self.generate_number() for _ in range(num_operators + 1)]
+    operators = [self.generate_operator() for _ in range(num_operators)]
     
-    def setUp(self):
-        """设置测试用的临时文件"""
-        # 创建原文临时文件
-        self.orig_content = "这是一个测试文本，用于测试文本相似度计算功能。"
-        self.orig_file = tempfile.NamedTemporaryFile(mode='w', delete=False, encoding='utf-8')
-        self.orig_file.write(self.orig_content)
-        self.orig_file.close()
-        
-        # 创建抄袭文临时文件（高度相似）
-        self.copy_content_similar = "这是一个测试文本，用于测试文本相似度计算功能。"
-        self.copy_file_similar = tempfile.NamedTemporaryFile(mode='w', delete=False, encoding='utf-8')
-        self.copy_file_similar.write(self.copy_content_similar)
-        self.copy_file_similar.close()
-        
-        # 创建抄袭文临时文件（部分相似）
-        self.copy_content_partial = "这是一个部分相似的测试文本，用于验证相似度计算。"
-        self.copy_file_partial = tempfile.NamedTemporaryFile(mode='w', delete=False, encoding='utf-8')
-        self.copy_file_partial.write(self.copy_content_partial)
-        self.copy_file_partial.close()
-        
-        # 创建抄袭文临时文件（完全不同）
-        self.copy_content_different = "这是一个完全不同的文本内容，用于测试差异情况。"
-        self.copy_file_different = tempfile.NamedTemporaryFile(mode='w', delete=False, encoding='utf-8')
-        self.copy_file_different.write(self.copy_content_different)
-        self.copy_file_different.close()
-        
-        # 创建结果文件
-        self.result_file = tempfile.NamedTemporaryFile(mode='w', delete=False, encoding='utf-8')
-        self.result_file.close()
+    # 构建基础表达式
+    parts = []
+    for i in range(num_operators):
+        parts.append(numbers[i])
+        parts.append(operators[i])
+    parts.append(numbers[-1])
     
-    def tearDown(self):
-        """清理测试文件"""
-        os.unlink(self.orig_file.name)
-        os.unlink(self.copy_file_similar.name)
-        os.unlink(self.copy_file_partial.name)
-        os.unlink(self.copy_file_different.name)
-        os.unlink(self.result_file.name)
+    expression = ' '.join(parts)
     
-    def test_read_file(self):
-        """测试文件读取功能"""
-        content = read_file(self.orig_file.name)
-        self.assertEqual(content, self.orig_content)
+    # 随机添加括号
+    if num_operators > 1 and random.random() < 0.4:
+        expression = self.add_parentheses(expression, num_operators)
     
-    def test_preprocess_text(self):
-        """测试文本预处理功能"""
-        text = "这是一个测试文本，包含标点符号！"
-        processed = preprocess_text(text)
-        # 检查是否去除了标点符号
-        self.assertNotIn("，", processed)
-        self.assertNotIn("！", processed)
-        # 检查是否进行了分词
-        self.assertIn(" ", processed)
-    
-    def test_calculate_similarity_identical(self):
-        """测试完全相同文本的相似度计算"""
-        similarity = calculate_similarity(self.orig_content, self.copy_content_similar)
-        self.assertEqual(similarity, 1.0)
-    
-    def test_calculate_similarity_partial(self):
-        """测试部分相似文本的相似度计算"""
-        similarity = calculate_similarity(self.orig_content, self.copy_content_partial)
-        # 相似度应该在0和1之间
-        self.assertGreater(similarity, 0)
-        self.assertLess(similarity, 1)
-    
-    def test_calculate_similarity_different(self):
-        """测试完全不同文本的相似度计算"""
-        similarity = calculate_similarity(self.orig_content, self.copy_content_different)
-        # 完全不同文本的相似度应该接近0
-        self.assertLess(similarity, 0.3)
-    
-    def test_write_result(self):
-        """测试结果写入功能"""
-        test_similarity = 0.85
-        write_result(self.result_file.name, test_similarity)
-        
-        # 读取写入的内容并验证
-        with open(self.result_file.name, 'r', encoding='utf-8') as f:
-            content = f.read()
-        self.assertIn("文本相似度: 0.85", content)
-
-if __name__ == '__main__':
-    unittest.main()
+    return expression + ' ='
 ```
+这段代码首先确定运算符的数量（1到3个），然后生成相应数量的数字和运算符。接着，将数字和运算符交错拼接成表达式。最后，以一定概率添加括号，以增加题目的多样性。
+
+关键代码段2：表达式计算：
+```python
+    def evaluate_expression(self, tokens: List[str]) -> Fraction:
+        """计算表达式的值（递归下降解析器）"""
+
+        def parse_expression() -> Fraction:
+            nonlocal index
+            left = parse_term()
+            while index < len(tokens) and tokens[index] in ['+', '-']:
+                op = tokens[index]
+                index += 1
+                right = parse_term()
+                if op == '+':
+                    left += right
+                else:  # '-'
+                    if left < right:
+                        raise ValueError("Negative result")
+                    left -= right
+            return left
+
+        def parse_term() -> Fraction:
+            nonlocal index
+            left = parse_factor()
+            while index < len(tokens) and tokens[index] in ['×', '÷']:
+                op = tokens[index]
+                index += 1
+                right = parse_factor()
+                if op == '×':
+                    left *= right
+                else:  # '÷'
+                    if right == 0:
+                        raise ValueError("Division by zero")
+                    result = left / right
+                    # 检查除法结果是否为真分数
+                    if result.denominator == 1:
+                        raise ValueError("Division result should be proper fraction")
+                    left = result
+            return left
+
+        def parse_factor() -> Fraction:
+            nonlocal index
+            if index >= len(tokens):
+                raise ValueError("Unexpected end of expression")
+
+            if tokens[index] == '(':
+                index += 1
+                result = parse_expression()
+                if index >= len(tokens) or tokens[index] != ')':
+                    raise ValueError("Missing closing parenthesis")
+                index += 1
+                return result
+            else:
+                # 解析数字
+                num_str = tokens[index]
+                index += 1
+                return self.parse_number(num_str)
+
+        index = 0
+        return parse_expression()
+
+```
+这段代码使用递归下降解析方法，能够处理加减乘除和括号。特别注意的是，在减法操作时，如果发现被减数小于减数，会抛出异常，从而确保表达式不产生负数。
+
+关键代码段3：答案检查:
+```python
+def check_answers(self, exercise_file: str, answer_file: str) -> Tuple[List[int], List[int]]:
+    """检查答案"""
+    correct = []
+    wrong = []
+    
+    try:
+        with open(exercise_file, 'r', encoding='utf-8') as f:
+            exercises = f.readlines()
+        
+        with open(answer_file, 'r', encoding='utf-8') as f:
+            given_answers = f.readlines()
+        
+        for i in range(min(len(exercises), len(given_answers))):
+            exercise = exercises[i].strip()
+            given_answer = given_answers[i].strip()
+            
+            # 解析题目编号和内容
+            exercise_match = re.match(r'\d+\.\s*(.+)', exercise)
+            answer_match = re.match(r'\d+\.\s*(.+)', given_answer)
+            
+            if exercise_match and answer_match:
+                exercise_content = exercise_match.group(1)
+                given_ans = answer_match.group(1)
+                
+                try:
+                    calculated_ans = self.generator.format_number(
+                        self.generator.calculate_expression(exercise_content)
+                    )
+                    
+                    if calculated_ans == given_ans:
+                        correct.append(i + 1)
+                    else:
+                        wrong.append(i + 1)
+                except Exception as e:
+                    print(f"Error checking exercise {i+1}: {e}")
+                    wrong.append(i + 1)
+    
+    except Exception as e:
+        print(f"Error reading files: {e}")
+    
+    return correct, wrong
+```
+这段代码读取题目文件和答案文件，逐题计算标准答案并与给定的答案比较，记录正确和错误的题号。
 
 ###4.2 测试函数说明
 
@@ -372,3 +412,12 @@ def test_empty_text_error(self):
 4. **资源清理**：确保在异常情况下也能正确释放所有资源
 
 这些异常处理设计确保了程序在各种异常情况下的稳定
+
+
+
+
+
+
+
+
+
